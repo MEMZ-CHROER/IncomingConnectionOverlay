@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# 第三方素材不入库（编译者自行获取，见 assets/README.txt）
+assets/*.png
+assets/*.wav
+assets/*.ttf
