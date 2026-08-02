@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- net48：Win10 1903+ / Win11 系统内置 .NET Framework 4.8，无需安装任何 runtime -->
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AssemblyName>IncomingConnectionOverlay</AssemblyName>
+    <RootNamespace>IncomingConnectionOverlay</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>0.4.0</Version>
+    <Company>LDTchara</Company>
+    <Product>IncomingConnectionOverlay</Product>
+    <Description>Hacknet Incoming Connection 全屏覆盖层动画工具</Description>
+    <Copyright>Copyright © 2026 LDTchara</Copyright>
+    <!-- Release 不生成 PDB：消除 exe 内的 PDB 路径字符串（静态分析指标），发布物更干净 -->
+    <DebugType Condition="'$(Configuration)' == 'Release'">none</DebugType>
+    <DebugSymbols Condition="'$(Configuration)' == 'Release'">false</DebugSymbols>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- 资源内嵌进 exe（EmbeddedResource），运行时从程序集内存加载；发布后单个 exe 即可运行 -->
+    <EmbeddedResource Include="assets\**" />
+  </ItemGroup>
+
+</Project>
