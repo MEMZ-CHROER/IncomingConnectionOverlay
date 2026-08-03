@@ -128,8 +128,8 @@ public class OverlayForm : Form
     private IntPtr _dibBits;
     private int _rowBytes;
 
-    // 排错日志
-    private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "overlay.log");
+    // 排错日志（internal：供 ScanWatcher 托盘"查看日志"菜单项使用）
+    internal static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "overlay.log");
     private int _ulwFailures;
 
     public OverlayForm(bool preview, bool autostart = true)
