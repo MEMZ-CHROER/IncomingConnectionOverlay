@@ -80,7 +80,6 @@ internal static class ScanWatcher
             _tray = new NotifyIcon
             {
                 Text = "IncomingConnectionOverlay — 扫描检测中（双击可手动触发）",
-                Visible = true,
             };
             try
             {
@@ -98,6 +97,7 @@ internal static class ScanWatcher
             {
                 _tray.Icon = SystemIcons.Shield;
             }
+            _tray.Visible = true; // 先设 Icon 再 Visible，避免刷新问题
 
             var menu = new ContextMenuStrip();
             var triggerItem = new ToolStripMenuItem("立即触发一次覆盖层");
@@ -114,6 +114,15 @@ internal static class ScanWatcher
             menu.Items.Add(exitItem);
             _tray.ContextMenuStrip = menu;
             _tray.DoubleClick += (_, _) => TriggerManual();
+
+            // 启动气泡，QQ 式可发现性提示
+            try
+            {
+                _tray.ShowBalloonTip(4000, "IncomingConnectionOverlay", "已驻留后台：检测到端口扫描自动触发覆盖层", ToolTipIcon.Info);
+            }
+            catch
+            {
+            }
         }
 
         /// <summary>托盘手动触发：跳过冷却，但覆盖层播放中不叠加。</summary>
