@@ -47,6 +47,26 @@ IncomingConnectionOverlay.exe --watch    # 驻留监视：检测到端口扫描�
 - 触发后 6s 动画 + 30s 冷却，检测与触发记录在 exe 同目录 `overlay.log`
 - 局限：慢速低流量扫描（nmap -T1 等）用户态轮询不敏感；完整覆盖需管理员权限或 Npcap
 
+### 配置（exe.config）
+
+可配置项在 exe 同目录的 `IncomingConnectionOverlay.exe.config` 的 `<appSettings>` 中，
+缺失或格式错误时回退默认值，程序始终可运行：
+
+| 配置项 | 默认值 | 说明 |
+|---|---|---|
+| `Duration` | `6` | 动画总时长（秒） |
+| `Fade` | `0.2` | 淡入/淡出时长（秒） |
+| `BarHeightMax` | `120` | 黑条最大高度（px，按 ScaleBase 缩放） |
+| `CenterWidth` | `700` | 中央排版区宽（px） |
+| `StripeHeightMax` | `24` | 斜纹高度（px） |
+| `StripeSpeed` | `1` | 斜纹滚动速度（贴图宽/秒） |
+| `BlinkPeriod` | `0.1` | 开场/收尾闪烁周期（秒） |
+| `BlinkOnRatio` | `0.5` | 闪烁占空比（0~1） |
+| `Tint` | `255,0,0` | tint 主色（R,G,B，0~255） |
+| `ScaleBase` | `1080` | 分辨率缩放基准（屏幕高度 px） |
+| `TitleText` | `INCOMING CONNECTION` | 标题文字 |
+| `DetailText` | `External...` | 详情文字（`&#10;` 为换行） |
+
 ## 构建
 
 ```powershell

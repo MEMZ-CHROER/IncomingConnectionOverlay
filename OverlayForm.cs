@@ -115,20 +115,10 @@ public class OverlayForm : Form
     [DllImport("kernel32.dll", EntryPoint = "RtlMoveMemory")]
     private static extern void RtlMoveMemory(IntPtr dest, IntPtr src, UIntPtr count);
 
-    // ---- 动画常量（与原版一致）----
-    private const float Duration = 6.0f;      // 总时长
-    private const float Fade = 0.2f;          // 淡入/淡出时长
-    private const int BarHeightMax = 120;     // 黑条最大高度
-    private const int CenterWidth = 700;      // 中央排版区宽
-    private const int StripeHeightMax = 24;   // 条纹高度
-    private const float StripeSpeed = 1.0f;   // 每秒滚动一个贴图宽
-    private const float BlinkPeriod = 0.1f;   // 闪烁周期
-    private const float BlinkOnRatio = 0.5f;  // 闪烁占空比
-
-    private static readonly Color DrawColor = Color.FromArgb(255, 255, 0, 0); // 原版 Color(290,0,0,0) → 纯红
-
     // net48 无 Random.Shared，用实例随机源
     private static readonly Random _rng = new();
+
+    private readonly Settings _settings;      // 可配置项（exe.config appSettings，带默认值）
 
     private readonly bool _preview;
     private readonly Rectangle _dest;
@@ -154,6 +144,8 @@ public class OverlayForm : Form
     {
         _preview = preview;
         KeyPreview = true;
+
+        _settings = Settings.Load(); // 从 exe.config 读取可配置项，缺失回退默认
 
         _assets = Assets.Load(); // 内嵌资源加载（缺失时回退 exe 旁 assets/ 目录）
 
@@ -218,7 +210,7 @@ public class OverlayForm : Form
             Present(t);
         }
 
-        if (t > Duration)
+        if (t > _settings.Duration)
         {
             _timer.Stop();
             Close();
@@ -349,30 +341,30 @@ public class OverlayForm : Form
 
         // 尺寸基准：原版常量按 1080p 设计。高分屏（如 2560x1600）固定像素会显小，
         // 按屏幕高度比例放大，保证各分辨率下占屏比例一致。
-        float s = dest.Height / 1080f;
+        float s = dest.Height / _settings.ScaleBase;
         if (s < 0.5f) s = 0.5f;
         if (s > 3.0f) s = 3.0f;
 
         // 闪烁：开场 0.5s 与收尾 0.5s，100ms 周期 50% 占空比（与原版 num%0.1f<0.05f 一致）
-        float blinkT = t > 5.5f ? t - 5.5f : t;
-        if (blinkT <= 0.5f && blinkT % BlinkPeriod < BlinkOnRatio * BlinkPeriod)
+        float blinkT = t > _settings.Duration - 0.5f ? t - (_settings.Duration - 0.5f) : t;
+        if (blinkT <= 0.5f && blinkT % _settings.BlinkPeriod < _settings.BlinkOnRatio * _settings.BlinkPeriod)
         {
             return;
         }
 
         // 淡入淡出：alpha（0~1）与黑条高度（0~120）联动
         float alpha = 1f;
-        int barH = (int)(BarHeightMax * s);
-        if (t < Fade)
+        int barH = (int)(_settings.BarHeightMax * s);
+        if (t < _settings.Fade)
         {
-            alpha = t / Fade;
-            barH = (int)(BarHeightMax * s * alpha);
+            alpha = t / _settings.Fade;
+            barH = (int)(_settings.BarHeightMax * s * alpha);
         }
-        else if (t > Duration - Fade)
+        else if (t > _settings.Duration - _settings.Fade)
         {
-            float f = 1f - (t - (Duration - Fade));
+            float f = 1f - (t - (_settings.Duration - _settings.Fade));
             alpha = f;
-            barH = (int)(BarHeightMax * s * f);
+            barH = (int)(_settings.BarHeightMax * s * f);
         }
 
         if (barH <= 0)
@@ -390,13 +382,13 @@ public class OverlayForm : Form
         // 上下边缘滚动斜纹
         if (_assets.StripePattern != null)
         {
-            int stripeH = (int)(StripeHeightMax * s * alpha);
+            int stripeH = (int)(_settings.StripeHeightMax * s * alpha);
             DrawStripe(g, new Rectangle(bar.X, bar.Y, bar.Width, stripeH), t, s);
             DrawStripe(g, new Rectangle(bar.X, bar.Bottom - stripeH, bar.Width, stripeH), t, s);
         }
 
         // 中央排版区
-        int cw = Math.Min((int)(CenterWidth * s), bar.Width);
+        int cw = Math.Min((int)(_settings.CenterWidth * s), bar.Width);
         Rectangle area = new(bar.X + bar.Width / 2 - cw / 2, bar.Y, cw, barH);
 
         // 警示图标：宽 = 图标纵横比 × 黑条高；底板外扩 30s → 图标内缩 4s（复刻原版）
@@ -417,7 +409,7 @@ public class OverlayForm : Form
         {
             // 原版：Lerp(Red, DrawColor, 0.95 + 0.05*rand) —— 两点均为纯红，等效恒红
             float lerpT = 0.95f + 0.05f * (float)_rng.NextDouble();
-            Color tint = Lerp(Color.Red, DrawColor, lerpT);
+            Color tint = Lerp(Color.Red, _settings.DrawColor, lerpT);
             DrawTinted(g, _assets.CautionIcon, iconInner, tint);
         }
 
@@ -433,15 +425,15 @@ public class OverlayForm : Form
         // 标题："INCOMING CONNECTION"（Kremlin，恒红不随淡入淡出）
         if (_assets.TitleFont != null)
         {
-            DrawLabel(g, "INCOMING CONNECTION", _assets.TitleFont, textRect, DrawColor, centerHoriz: false);
+            DrawLabel(g, _settings.TitleText, _assets.TitleFont, textRect, _settings.DrawColor, centerHoriz: false);
         }
 
         // 详情两行小字（随淡入淡出）：原版 dest3.Y += dest3.Height - 27; dest3.Height = barH * 0.2
         if (_assets.DetailFont != null)
         {
             Rectangle detailRect = new(textRect.X, textRect.Y + textRect.Height - (int)(27 * s), textRect.Width, (int)(barH * 0.2));
-            Color detailColor = Color.FromArgb((int)(255 * alpha), DrawColor.R, DrawColor.G, DrawColor.B);
-            DrawLabel(g, "External unsyndicated UDP traffic on port 22\nLogging all activity to ~/log", _assets.DetailFont, detailRect, detailColor, centerHoriz: false);
+            Color detailColor = Color.FromArgb((int)(255 * alpha), _settings.DrawColor.R, _settings.DrawColor.G, _settings.DrawColor.B);
+            DrawLabel(g, _settings.DetailText, _assets.DetailFont, detailRect, detailColor, centerHoriz: false);
         }
     }
 
@@ -472,7 +464,7 @@ public class OverlayForm : Form
         int tileW = tile.Width;
         EnsureRedStripeTile(tile);
         // 滚动速度随缩放比例放大，与视觉尺寸协调（模仍为 tileW，保证平铺无缝）
-        int scroll = (int)((t * StripeSpeed * tileW * s) % tileW);
+        int scroll = (int)((t * _settings.StripeSpeed * tileW * s) % tileW);
 
         using TextureBrush brush = new(_redStripeTile, WrapMode.Tile);
 
@@ -497,12 +489,13 @@ public class OverlayForm : Form
         using (Graphics g = Graphics.FromImage(_redStripeTile))
         using (ImageAttributes attrs = new())
         {
-            attrs.SetColorMatrix(RedTintMatrix());
+            // 条纹 tint 跟随配置主色（原版 patternColor=DrawColor）
+            attrs.SetColorMatrix(TintMatrix(_settings.DrawColor));
             g.DrawImage(tile, new Rectangle(0, 0, tile.Width, tile.Height), 0, 0, tile.Width, tile.Height, GraphicsUnit.Pixel, attrs);
         }
     }
 
-    /// <summary>图标按 tint 色绘制（保留 alpha）。</summary>
+    /// <summary>按 tint 色绘制贴图（保留 alpha）：输出 = 源色 × tint/255，对应 XNA 乘法 tint。</summary>
     private void DrawTinted(Graphics g, Bitmap bmp, Rectangle dest, Color tint)
     {
         if (dest.Width <= 0 || dest.Height <= 0)
@@ -510,27 +503,20 @@ public class OverlayForm : Form
             return;
         }
 
-        float r = tint.R / 255f, gr = tint.G / 255f, b = tint.B / 255f;
         using ImageAttributes attrs = new();
-        attrs.SetColorMatrix(new ColorMatrix(new[]
+        attrs.SetColorMatrix(TintMatrix(tint));
+        g.DrawImage(bmp, dest, 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, attrs);
+    }
+
+    /// <summary>乘法 tint 的 ColorMatrix：输出 = 源色 × tint/255（alpha 保留）。</summary>
+    private static ColorMatrix TintMatrix(Color tint)
+    {
+        float r = tint.R / 255f, gr = tint.G / 255f, b = tint.B / 255f;
+        return new ColorMatrix(new[]
         {
             new float[] { r, 0, 0, 0, 0 },
             new float[] { 0, gr, 0, 0, 0 },
             new float[] { 0, 0, b, 0, 0 },
-            new float[] { 0, 0, 0, 1, 0 },
-            new float[] { 0, 0, 0, 0, 1 },
-        }));
-        g.DrawImage(bmp, dest, 0, 0, bmp.Width, bmp.Height, GraphicsUnit.Pixel, attrs);
-    }
-
-    /// <summary>红黑 tint 矩阵（保留 R 通道，G/B 归零）——对应 XNA 乘法 tint DrawColor(255,0,0)。</summary>
-    private static ColorMatrix RedTintMatrix()
-    {
-        return new ColorMatrix(new[]
-        {
-            new float[] { 1, 0, 0, 0, 0 },
-            new float[] { 0, 0, 0, 0, 0 },
-            new float[] { 0, 0, 0, 0, 0 },
             new float[] { 0, 0, 0, 1, 0 },
             new float[] { 0, 0, 0, 0, 1 },
         });
