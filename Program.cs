@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Windows.Forms;
 
 namespace IncomingConnectionOverlay;
@@ -19,6 +20,18 @@ internal static class Program
         int snapIdx = Array.FindIndex(args, a => a.Equals("--snapshot", StringComparison.OrdinalIgnoreCase));
         string snapshotPath = snapIdx >= 0 && snapIdx + 1 < args.Length ? args[snapIdx + 1] : null;
         bool watch = Array.Exists(args, a => a.Equals("--watch", StringComparison.OrdinalIgnoreCase));
+
+        // 日志为会话级：每次启动清空上次的 overlay.log（删除失败静默，不影响运行）
+        try
+        {
+            if (File.Exists(OverlayForm.LogPath))
+            {
+                File.Delete(OverlayForm.LogPath);
+            }
+        }
+        catch
+        {
+        }
 
         // DPI awareness 由 app.manifest 声明（PerMonitorV2），net48 无 Application.SetHighDpiMode
         Application.EnableVisualStyles();
