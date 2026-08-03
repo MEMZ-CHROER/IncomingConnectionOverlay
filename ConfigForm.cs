@@ -77,6 +77,7 @@ public sealed class ConfigForm : Form
         var resetBtn = new Button { Text = "恢复默认", Width = 90 };
         resetBtn.Click += (_, _) => ResetToDefaults();
         var cancelBtn = new Button { Text = "取消", Width = 90, DialogResult = DialogResult.Cancel };
+        cancelBtn.Click += (_, _) => Close(); // 非模态（Show）下 DialogResult 不会自动关窗，需显式 Close
 
         var btnPanel = new FlowLayoutPanel
         {
