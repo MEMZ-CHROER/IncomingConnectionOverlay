@@ -1,77 +1,69 @@
-# IncomingConnectionOverlay（本目录：icco.exe 的逆向还原源码）
+# IncomingConnectionOverlay
 
-本目录是从 `icco.exe`（v0.4.0.0）逆向还原出来的完整可构建源码，与同目录的
-`icco.exe` 一一对应。上游项目：<https://github.com/LDTchara/IncomingConnectionOverlay>
-（本目录是**旧版**行为还原，上游 HEAD 已修复若干 bug，差异见下文）。
+复刻《Hacknet》游戏 **"INCOMING CONNECTION"** 全屏警告覆盖层动画的 Windows 桌面工具。
+运行后播放一次 6 秒的入侵警告动画（黑条 + 滚动斜纹 + 警示图标 + Kremlin 标题 + 警报音）并自动退出；
+`--watch` 模式下驻留后台，检测到端口扫描（nmap 等）时自动触发一次。
 
-> 程序本身是《Hacknet》游戏 "INCOMING CONNECTION" 警告动画的桌面复刻：
-> 全屏置顶透明覆盖层，播放一次 6 秒入侵警告动画（黑条 + 滚动斜纹 + 警示图标 +
-> Kremlin 字体标题 + 警报音），自动退出。无网络行为。
+## 来源与版权（重要）
 
-## 文件
+**本仓库的源码源自 [LDTchara/IncomingConnectionOverlay](https://github.com/LDTchara/IncomingConnectionOverlay)，MIT 许可**，在其基础上做修复与扩展，并非对二进制的新开发实现。
 
-- `Program.cs` / `Assets.cs` / `OverlayForm.cs` / `ScanWatcher.cs` — 还原源码 + `--watch` 扫描检测（行为按 exe 的 IL 逐方法核对）
-- `assets/` — 构建所需的贴图/字体/音效，**本地持有、不入库**（从《Hacknet》游戏解包，版权物，禁止二次分发）；
-  清单与获取指引见 `assets/README.txt`，缺失时程序自动降级（跳过对应元素，不崩溃）
-- `IncomingConnectionOverlay.csproj` / `app.manifest` / `LICENSE.txt` — 构建配置（net48）
+目录中的 `icco.exe` 是上游项目的**旧版构建**。逆向分析（IL 逐方法比对、`--snapshot` 逐像素对拍、`--dumpsound` 逐字节对拍）仅用于**核对行为、定位旧版构建的缺陷**，据此修复了两处问题：
 
-> 仓库规则：仅源码入库。构建产物（`bin/`）与版权资源（`assets/*.png|wav|ttf`）均被
-> `.gitignore` 排除；克隆后需自行准备 `assets/` 目录才能完整构建（无资源时仍可编译，运行会缺视觉/音效）。
+1. `--preview` 判定逻辑反转：旧版把 `Array.FindIndex` 的返回值当 bool 用（不带参数返回 -1，反而进预览窗口；`--preview` 排第 0 位反而进全屏）。已按上游修复语义改为 `Array.Exists + Equals`。
+2. 嵌入字体（kremlin-1.ttf）加载成功时 `DetailFont` 未被赋值，详情小字不绘制。已修复为无条件设置。
 
-## 构建
+本仓库相对上游的增量：
 
-```powershell
-dotnet build IncomingConnectionOverlay.slnx -c Release
-# 或
-dotnet publish IncomingConnectionOverlay.slnx -c Release   # bin\Release\net48\publish\
-```
+- `--watch` 模式（`ScanWatcher.cs`）：后台驻留，双信号检测端口扫描——TCP 连接表轮询（按源 IP 归因，`SYN_RCVD`/LISTEN 端口入站事件）+ RST 洪峰计数（`GetTcpStatistics.dwOutRsts`，可捕获连接表不留痕的纯 `-sS` 扫描）；触发一次覆盖层，30s 冷却，日志写 `overlay.log`
+- 构建便利：csproj 引入 `Microsoft.NETFramework.ReferenceAssemblies`，无 .NET Framework 4.8 targeting pack 的环境也可构建
+
+**游戏资源（贴图/字体/音效）从《Hacknet》解包，版权归原游戏，不入库、不二次分发。** 构建需要本地 `assets/` 目录（清单与获取指引见 `assets/README.txt`）；资源缺失时程序自动降级（跳过对应元素，不崩溃）。
+
+## 特性
+
+- **6 秒完整动画**：0.2s 淡入（黑条展开）→ 保持 → 0.5s 淡出，开场/收尾 10Hz 闪烁
+- **全屏透明覆盖层**：置顶、鼠标点击穿透、不进任务栏，显示期间不干扰操作
+- **分辨率自适应**：元素按屏幕高度相对 1080p 基准缩放
+- **三音效纯内存播放**：beep + DoomShock/BrightFlash 双音叠加，运行时混音，不写临时文件
+- **`--watch` 扫描检测**：连接表 + RST 洪峰双信号，免管理员
+- **零网络、零外部依赖**；.NET Framework 4.8（Win10 1903+ / Win11 系统内置）
 
 ## 使用
 
 ```
 IncomingConnectionOverlay.exe            # 播放 6 秒覆盖层动画后自动退出；ESC 强制退出
-IncomingConnectionOverlay.exe --preview  # 窗口模式调试（见下方"注意"）
-IncomingConnectionOverlay.exe --snapshot out.png [t]  # 渲染第 t 秒一帧到 png
-IncomingConnectionOverlay.exe --dumpsound out.wav     # 导出合成音效
-IncomingConnectionOverlay.exe --watch    # 驻留监视：检测到端口扫描（nmap 等）就弹一次覆盖层
+IncomingConnectionOverlay.exe --preview  # 800×450 可拖动调试窗口
+IncomingConnectionOverlay.exe --snapshot out.png [t]  # 渲染第 t 秒（默认 3.0）一帧到 png
+IncomingConnectionOverlay.exe --dumpsound out.wav     # 导出合成音效 wav
+IncomingConnectionOverlay.exe --watch    # 驻留监视：检测到端口扫描就弹一次覆盖层
 ```
 
-### --watch（端口扫描触发模式）
+### --watch 检测说明
 
-后台驻留（无窗口、免管理员），双信号检测：
+- 每 100ms 轮询 `GetExtendedTcpTable`（与 netstat 同源）：同一源 IP 在 3s 窗口内触及 ≥8 个不同端口（或非回环源 ≥24 次入站事件）→ 判定为扫描
+- 同时轮询 `GetTcpStatistics.dwOutRsts`：3s 内 RST 增量 ≥40 → 判定为扫描（可捕获纯 `-sS` SYN 扫描）
+- 回环源（127.x）只走"不同端口数"门槛（本机自连/健康检查不误报）
+- 触发后 6s 动画 + 30s 冷却，检测与触发记录在 exe 同目录 `overlay.log`
+- 局限：慢速低流量扫描（nmap -T1 等）用户态轮询不敏感；完整覆盖需管理员权限或 Npcap
 
-1. **连接表信号**（可按源 IP 归因）：每 100ms 轮询 `GetExtendedTcpTable`（与 netstat 同源），
-   统计确凿的入站事件：`SYN_RCVD`（半开连接 = SYN 扫描特征）或目标端口处于 LISTEN 的连接（connect 扫描）——
-   浏览器等出站流量天然排除。同一源 IP 在 3s 窗口内触及 ≥8 个不同端口（或非回环源 ≥24 次事件）→ 判定为扫描。
-2. **RST 洪峰信号**（全局，无归因）：轮询 `GetTcpStatistics.dwOutRsts` 计数。
-   SYN 扫描对关闭端口会让主机瞬间回发大量 RST（实测 `nmap -sS localhost`：+1000），
-   3s 内增量 ≥40 即判定为扫描——连接表完全不留痕的纯 SYN 扫描也能抓到。
+## 构建
 
-- **回环源（127.x）也可以触发**（`nmap localhost` 有效），但只走"≥8 个不同端口"门槛——
-  本机服务的高频自连（如单端口健康检查）不会误报
-- 触发一次：6s 动画播放期间 + 30s 冷却内不重复触发，之后重新武装
-- 检测与触发都记入 `overlay.log`（位于 exe 同目录）
+```powershell
+dotnet build IncomingConnectionOverlay.csproj -c Release   # 或 dotnet publish
+```
 
-实测（本机）：`nmap -sS -Pn localhost` / `nmap -sT -Pn localhost` 均触发；空闲时本机 loopback 自连流量不误报。
-已知局限：慢速、低流量扫描（nmap -T1 等）用户态轮询不敏感；完整覆盖需管理员权限或 Npcap 抓包。
+产物在 `bin\Release\net48\`。要求：.NET SDK（8+ 均可，net48 目标）+ 本地 `assets/` 目录。
 
-## 还原说明：与上游源码 HEAD 的差异（exe 固有行为）
+## 验证记录
 
-1. **`--preview` 判定逻辑在 exe 里是反的**（`Program.cs` 已修复）：
-   旧版用 `Array.FindIndex` 的**返回值**当 bool 用（`new OverlayForm(previewIdx, 1)`，
-   ctor 里 `previewIdx != 0` 才算预览），导致：
-   - 不带参数：索引 `-1` → **预览窗口**（即你现在遇到的"怎么是 preview"）
-   - `--preview` 恰好是第 0 个参数：索引 `0` → **全屏覆盖层**
-   匹配还用 `EndsWith`（`x--preview` 也会命中）。
-   **本目录源码已按上游修复**：`Array.Exists` + `Equals` + `bool` 参数，
-   默认运行即全屏覆盖层，显式 `--preview` 才进预览窗口。原版 `icco.exe`
-   仍是旧逻辑（不带参数出预览窗口，`--preview` 放第一位才出全屏）。
-2. **`textRect` 无 clamp**：旧版标题排版矩形不做 `Math.Max` 保护；上游新版有。
+还原/修复后的源码与旧版构建 `icco.exe` 行为对拍：
 
-其余逻辑（分层渲染、闪烁时间轴、音效内存混音、资源嵌入优先/目录回退、6 秒自动退出等）与上游一致。
+- `--snapshot`：t=0.05/0.1/0.15/1.0/3.0/5.55/5.6/5.75/5.9/6.0/6.5 各时刻 PNG **逐字节一致**
+- `--dumpsound`：导出 wav **逐字节一致**
+- `--watch`：`nmap -sS / -sT localhost` 均触发；空闲时本机 loopback 自连不误报
 
-## 验证
+## 许可
 
-还原版与原版 exe 的行为对拍：`--snapshot` 在 t=0.05/0.1/0.15/1.0/3.0/5.55/5.6/5.75/5.9/6.0/6.5
-各时刻渲染的 PNG 与原版**逐字节一致**；`--dumpsound` 导出的 wav 也逐字节一致
-（对拍时 `--snapshot`/`--dumpsound` 路径不受上述 `--preview` 修复影响）。
+MIT。代码版权归上游作者 **LDTchara**（[上游仓库](https://github.com/LDTchara/IncomingConnectionOverlay)）；本仓库为其衍生（修复与扩展）。
+游戏资源版权归《Hacknet》游戏所有，本仓库不包含、不分发。
