@@ -28,6 +28,7 @@ public sealed class ConfigForm : Form
     private readonly TextBox _titleText = new() { Width = 220 };
     private readonly TextBox _detailText = new() { Width = 220, Multiline = true, Height = 60, ScrollBars = ScrollBars.Vertical };
     private readonly CheckBox _syncIp = new() { Text = "检测到扫描时同步真实源 IP 到详情文字", AutoSize = true };
+    private readonly CheckBox _notify = new() { Text = "显示托盘通知（启动气泡 + 检测到攻击气泡）", AutoSize = true };
 
     public ConfigForm()
     {
@@ -36,8 +37,8 @@ public sealed class ConfigForm : Form
         MaximizeBox = true;
         MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(480, 680);
-        MinimumSize = new Size(460, 560);
+        ClientSize = new Size(620, 640);
+        MinimumSize = new Size(600, 520);
         AutoScroll = true; // DPI 放大时内容可滚动，底部按钮不被挤出
 
         LoadCurrentValues();
@@ -50,7 +51,7 @@ public sealed class ConfigForm : Form
             ColumnCount = 2,
             Padding = new Padding(12, 12, 12, 0),
         };
-        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 160)); // 标签列：加宽防中文换行
+        table.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 220)); // 标签列：加宽防中文换行
         table.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100));
 
         AddRow(table, "总时长（秒）", _duration);
@@ -68,6 +69,7 @@ public sealed class ConfigForm : Form
         AddRow(table, "标题文字", _titleText);
         AddRow(table, "详情文字（可换行）", _detailText);
         AddRow(table, "同步源 IP", _syncIp);
+        AddRow(table, "托盘通知", _notify);
 
         Controls.Add(table);
 
@@ -120,6 +122,7 @@ public sealed class ConfigForm : Form
         _titleText.Text = s.TitleText;
         _detailText.Text = s.DetailText;
         _syncIp.Checked = s.SyncIpToDetail;
+        _notify.Checked = s.ShowNotifications;
     }
 
     private static decimal Clamp(decimal v, NumericUpDown nud)
@@ -147,6 +150,7 @@ public sealed class ConfigForm : Form
         _titleText.Text = def.TitleText;
         _detailText.Text = def.DetailText;
         _syncIp.Checked = def.SyncIpToDetail;
+        _notify.Checked = def.ShowNotifications;
     }
 
     private void Save()
@@ -168,6 +172,7 @@ public sealed class ConfigForm : Form
             Set(app, "TitleText", _titleText.Text);
             Set(app, "DetailText", _detailText.Text);
             Set(app, "SyncIpToDetail", _syncIp.Checked ? "true" : "false");
+            Set(app, "ShowNotifications", _notify.Checked ? "true" : "false");
 
             config.Save(ConfigurationSaveMode.Modified);
             ConfigurationManager.RefreshSection("appSettings");

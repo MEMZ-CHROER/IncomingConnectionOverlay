@@ -24,6 +24,7 @@ public sealed class Settings
     public string TitleText = "INCOMING CONNECTION";
     public string DetailText = "External unsyndicated UDP traffic on port 22\nLogging all activity to ~/log";
     public bool SyncIpToDetail = true;         // watch 检测到扫描时，是否把真实源 IP 注入详情文字
+    public bool ShowNotifications = true;      // 是否显示托盘通知（启动气泡 + 检测到攻击气泡）
 
     public static Settings Load()
     {
@@ -40,6 +41,7 @@ public sealed class Settings
         s.TitleText = GetString("TitleText", s.TitleText);
         s.DetailText = GetString("DetailText", s.DetailText);
         s.SyncIpToDetail = GetBool("SyncIpToDetail", s.SyncIpToDetail);
+        s.ShowNotifications = GetBool("ShowNotifications", s.ShowNotifications);
 
         string tint = GetString("Tint", null);
         if (tint != null)

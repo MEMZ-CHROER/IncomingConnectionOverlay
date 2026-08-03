@@ -139,13 +139,16 @@ internal static class ScanWatcher
             _tray.ContextMenuStrip = menu;
             _tray.DoubleClick += (_, _) => TriggerManual();
 
-            // 启动气泡，QQ 式可发现性提示
-            try
+            // 启动气泡，QQ 式可发现性提示（配置 ShowNotifications=false 时关闭）
+            if (Settings.Load().ShowNotifications)
             {
-                _tray.ShowBalloonTip(4000, "IncomingConnectionOverlay", "已驻留后台：检测到端口扫描自动触发覆盖层", ToolTipIcon.Info);
-            }
-            catch
-            {
+                try
+                {
+                    _tray.ShowBalloonTip(4000, "IncomingConnectionOverlay", "已驻留后台：检测到端口扫描自动触发覆盖层", ToolTipIcon.Info);
+                }
+                catch
+                {
+                }
             }
         }
 
@@ -191,12 +194,16 @@ internal static class ScanWatcher
 
         private void NotifyTray()
         {
-            try
+            // 检测到攻击的气泡（配置 ShowNotifications=false 时关闭；每次触发读配置，即时生效）
+            if (Settings.Load().ShowNotifications)
             {
-                _tray?.ShowBalloonTip(3000, "IncomingConnectionOverlay", "检测到端口扫描，已触发警告覆盖层", ToolTipIcon.Warning);
-            }
-            catch
-            {
+                try
+                {
+                    _tray?.ShowBalloonTip(3000, "IncomingConnectionOverlay", "检测到端口扫描，已触发警告覆盖层", ToolTipIcon.Warning);
+                }
+                catch
+                {
+                }
             }
         }
 
