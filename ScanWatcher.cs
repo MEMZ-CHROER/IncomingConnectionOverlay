@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Drawing;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows.Forms;
@@ -60,6 +61,7 @@ internal static class ScanWatcher
         private bool _overlayActive;
         private DateTime _lastTrigger = DateTime.MinValue;
         private long _lastOutRsts = -1;
+        private NotifyIcon _tray;
 
         public WatchForm()
         {
@@ -68,6 +70,75 @@ internal static class ScanWatcher
             Text = "IncomingConnectionOverlay — watch";
             _timer.Tick += (_, _) => Poll();
             _timer.Start();
+            SetupTray();
+            FormClosed += (_, _) => _tray?.Dispose();
+        }
+
+        /// <summary>QQ 式托盘：常驻通知区，双击/菜单手动触发一次，菜单退出结束驻留。</summary>
+        private void SetupTray()
+        {
+            _tray = new NotifyIcon
+            {
+                Text = "IncomingConnectionOverlay — 扫描检测中（双击可手动触发）",
+                Visible = true,
+            };
+            try
+            {
+                using var assets = Assets.Load();
+                if (assets.CautionIcon != null)
+                {
+                    using var hicon = Icon.FromHandle(assets.CautionIcon.GetHicon());
+                    _tray.Icon = (Icon)hicon.Clone(); // 克隆脱离位图生命周期
+                }
+            }
+            catch
+            {
+            }
+            if (_tray.Icon == null)
+            {
+                _tray.Icon = SystemIcons.Shield;
+            }
+
+            var menu = new ContextMenuStrip();
+            var triggerItem = new ToolStripMenuItem("立即触发一次覆盖层");
+            triggerItem.Click += (_, _) => TriggerManual();
+            var exitItem = new ToolStripMenuItem("退出");
+            exitItem.Click += (_, _) =>
+            {
+                _timer.Stop();
+                Close();
+                Application.Exit();
+            };
+            menu.Items.Add(triggerItem);
+            menu.Items.Add(new ToolStripSeparator());
+            menu.Items.Add(exitItem);
+            _tray.ContextMenuStrip = menu;
+            _tray.DoubleClick += (_, _) => TriggerManual();
+        }
+
+        /// <summary>托盘手动触发：跳过冷却，但覆盖层播放中不叠加。</summary>
+        private void TriggerManual()
+        {
+            if (_overlayActive)
+            {
+                return;
+            }
+            _lastTrigger = DateTime.UtcNow;
+            _inbound.Clear();
+            _rstSamples.Clear();
+            Log("MANUAL trigger from tray — showing overlay");
+            ShowOverlay();
+        }
+
+        private void NotifyTray()
+        {
+            try
+            {
+                _tray?.ShowBalloonTip(3000, "IncomingConnectionOverlay", "检测到端口扫描，已触发警告覆盖层", ToolTipIcon.Warning);
+            }
+            catch
+            {
+            }
         }
 
         private void Poll()
@@ -159,6 +230,13 @@ internal static class ScanWatcher
                     $"ports=[{string.Join(",", sample)}{(sample.Count >= 12 ? ",..." : "")}] — triggering overlay");
             }
 
+            var overlay = new OverlayForm(preview: false);
+            NotifyTray(); // 检测到扫描 → 气泡提示
+            ShowOverlay();
+        }
+
+        private void ShowOverlay()
+        {
             var overlay = new OverlayForm(preview: false);
             overlay.FormClosed += (_, _) =>
             {
