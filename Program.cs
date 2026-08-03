@@ -10,6 +10,7 @@ internal static class Program
     /// 默认：全屏透明覆盖层（置顶、点击穿透），运行后播放一次 Incoming Connection 动画并自动退出。
     /// --preview：以普通窗口模式运行，便于调试动画（可拖动、可缩放、ESC 退出）。
     /// --snapshot &lt;path&gt;：渲染一帧（t=3.0s）到指定 png 后退出，用于无头自验证绘制内容。
+/// --watch：驻留后台监视入站连接，检测到疑似端口扫描（nmap 等）时自动触发一次覆盖层动画。
     /// </summary>
     [STAThread]
     private static void Main(string[] args)
@@ -17,10 +18,18 @@ internal static class Program
         bool preview = Array.Exists(args, a => a.Equals("--preview", StringComparison.OrdinalIgnoreCase));
         int snapIdx = Array.FindIndex(args, a => a.Equals("--snapshot", StringComparison.OrdinalIgnoreCase));
         string snapshotPath = snapIdx >= 0 && snapIdx + 1 < args.Length ? args[snapIdx + 1] : null;
+        bool watch = Array.Exists(args, a => a.Equals("--watch", StringComparison.OrdinalIgnoreCase));
 
         // DPI awareness 由 app.manifest 声明（PerMonitorV2），net48 无 Application.SetHighDpiMode
         Application.EnableVisualStyles();
         Application.SetCompatibleTextRenderingDefault(false);
+
+        if (watch)
+        {
+            // 驻留监视：被端口扫描就弹一次覆盖层（见 ScanWatcher.cs）
+            Application.Run(new ScanWatcher.WatchForm());
+            return;
+        }
 
         if (snapshotPath != null)
         {

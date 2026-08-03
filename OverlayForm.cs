@@ -614,7 +614,8 @@ public class OverlayForm : Form
         base.OnFormClosed(e);
     }
 
-    private static void Log(string msg)
+    // 供 --watch 模式（ScanWatcher）记录检测与触发日志
+    internal static void Log(string msg)
     {
         try
         {

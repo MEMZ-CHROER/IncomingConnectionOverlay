@@ -26,4 +26,9 @@
     <EmbeddedResource Include="assets\**" />
   </ItemGroup>
 
+  <!-- 无 .NET Framework 4.8 targeting pack 的环境（如纯 dotnet SDK/CI）也能构建 -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
 </Project>
