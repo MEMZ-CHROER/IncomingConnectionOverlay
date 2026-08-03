@@ -361,7 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-# �������زĲ���⣨���������л�ȡ���� assets/README.txt��
+# 第三方素材不入库，（编译者请自行获取）见assets/README.txt
 
 # this repo
 icco.exe
