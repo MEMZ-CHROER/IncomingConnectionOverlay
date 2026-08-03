@@ -23,6 +23,7 @@ public sealed class Settings
     public float ScaleBase = 1080f;          // 分辨率缩放基准（屏幕高度 px）
     public string TitleText = "INCOMING CONNECTION";
     public string DetailText = "External unsyndicated UDP traffic on port 22\nLogging all activity to ~/log";
+    public bool SyncIpToDetail = true;         // watch 检测到扫描时，是否把真实源 IP 注入详情文字
 
     public static Settings Load()
     {
@@ -38,6 +39,7 @@ public sealed class Settings
         s.ScaleBase = GetFloat("ScaleBase", s.ScaleBase);
         s.TitleText = GetString("TitleText", s.TitleText);
         s.DetailText = GetString("DetailText", s.DetailText);
+        s.SyncIpToDetail = GetBool("SyncIpToDetail", s.SyncIpToDetail);
 
         string tint = GetString("Tint", null);
         if (tint != null)
@@ -73,5 +75,11 @@ public sealed class Settings
     {
         string v = ConfigurationManager.AppSettings[key];
         return int.TryParse(v, NumberStyles.Integer, CultureInfo.InvariantCulture, out int r) ? r : def;
+    }
+
+    private static bool GetBool(string key, bool def)
+    {
+        string v = ConfigurationManager.AppSettings[key];
+        return bool.TryParse(v, out bool r) ? r : def;
     }
 }

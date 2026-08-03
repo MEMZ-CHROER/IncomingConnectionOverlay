@@ -302,8 +302,10 @@ internal static class ScanWatcher
             }
 
             NotifyTray(); // 检测到扫描 → 气泡提示
-            // 连接表信号有源 IP：详情文字注入真实攻击源（RST 信号无归因则用默认文案）
-            ShowOverlay(rstDesc != null ? null : $"External connection from {IpToString(ip.Value)}\nLogging all activity to ~/log");
+            // 连接表信号有源 IP：按配置 SyncIpToDetail 决定是否把真实攻击源注入详情文字
+            // （RST 信号无归因，始终用默认文案）；每次触发读配置，修改即时生效
+            bool syncIp = rstDesc == null && Settings.Load().SyncIpToDetail;
+            ShowOverlay(syncIp ? $"External connection from {IpToString(ip.Value)}\nLogging all activity to ~/log" : null);
         }
 
         private void ShowOverlay(string detailOverride = null)

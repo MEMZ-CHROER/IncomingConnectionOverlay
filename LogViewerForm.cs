@@ -1,6 +1,7 @@
 using System;
 using System.Drawing;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows.Forms;
 
 namespace IncomingConnectionOverlay;
@@ -11,6 +12,15 @@ namespace IncomingConnectionOverlay;
 /// </summary>
 public sealed class LogViewerForm : Form
 {
+    // 原生消息：精确读写第一个可见行，刷新后保持查看位置
+    private const int EM_GETFIRSTVISIBLELINE = 0x00CE; // WM_USER + 30
+    private const int EM_LINESCROLL = 0x00B6;          // WM_USER + 6
+
+    [DllImport("user32.dll", CharSet = CharSet.Auto)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
+
+    private int _firstVisibleLine; // 刷新前第一个可见行号
+
     private readonly TextBox _view = new()
     {
         Multiline = true,
@@ -23,7 +33,6 @@ public sealed class LogViewerForm : Form
         ForeColor = Color.FromArgb(220, 220, 220),
     };
     private readonly System.Windows.Forms.Timer _timer = new() { Interval = 2000 };
-    private int _topCharIdx; // 刷新前视口顶部字符索引，用于刷新后还原查看位置
 
     public LogViewerForm()
     {
@@ -58,22 +67,21 @@ public sealed class LogViewerForm : Form
     {
         try
         {
-            // 记录当前视口顶部字符索引（取视口左上角第一个可见字符）
-            if (_view.TextLength > 0)
+            // 记录当前第一个可见行号（原生消息，精确）
+            if (_view.IsHandleCreated && _view.TextLength > 0)
             {
-                _topCharIdx = _view.GetCharIndexFromPosition(new Point(2, 2));
+                _firstVisibleLine = (int)SendMessage(_view.Handle, EM_GETFIRSTVISIBLELINE, IntPtr.Zero, IntPtr.Zero);
             }
 
             string path = OverlayForm.LogPath;
             string text = File.Exists(path) ? File.ReadAllText(path) : "（尚无日志：overlay.log 不存在）";
             _view.Text = text;
 
-            // 还原查看位置：滚动到刷新前视口顶部对应的字符处（追加式日志中该索引指向同一行）
-            if (_view.TextLength > 0 && _topCharIdx <= _view.TextLength)
+            // 还原查看位置：Text 赋值后视口回到顶部（第 0 行），
+            // EM_LINESCROLL 相对滚动 N 行 = 回到刷新前的第一个可见行（追加式日志顶部行号不变）。
+            if (_view.IsHandleCreated && _view.TextLength > 0 && _firstVisibleLine > 0)
             {
-                _view.SelectionStart = _topCharIdx;
-                _view.SelectionLength = 0;
-                _view.ScrollToCaret();
+                SendMessage(_view.Handle, EM_LINESCROLL, IntPtr.Zero, (IntPtr)_firstVisibleLine);
             }
         }
         catch

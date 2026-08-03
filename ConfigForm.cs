@@ -27,6 +27,7 @@ public sealed class ConfigForm : Form
     private readonly NumericUpDown _scaleBase = new() { Minimum = 100m, Maximum = 8000m, Increment = 10m };
     private readonly TextBox _titleText = new() { Width = 220 };
     private readonly TextBox _detailText = new() { Width = 220, Multiline = true, Height = 60, ScrollBars = ScrollBars.Vertical };
+    private readonly CheckBox _syncIp = new() { Text = "检测到扫描时同步真实源 IP 到详情文字", AutoSize = true };
 
     public ConfigForm()
     {
@@ -66,6 +67,7 @@ public sealed class ConfigForm : Form
         AddRow(table, "缩放基准（屏幕高）", _scaleBase);
         AddRow(table, "标题文字", _titleText);
         AddRow(table, "详情文字（可换行）", _detailText);
+        AddRow(table, "同步源 IP", _syncIp);
 
         Controls.Add(table);
 
@@ -116,6 +118,7 @@ public sealed class ConfigForm : Form
         _scaleBase.Value = Clamp((decimal)s.ScaleBase, _scaleBase);
         _titleText.Text = s.TitleText;
         _detailText.Text = s.DetailText;
+        _syncIp.Checked = s.SyncIpToDetail;
     }
 
     private static decimal Clamp(decimal v, NumericUpDown nud)
@@ -142,6 +145,7 @@ public sealed class ConfigForm : Form
         _scaleBase.Value = Clamp((decimal)def.ScaleBase, _scaleBase);
         _titleText.Text = def.TitleText;
         _detailText.Text = def.DetailText;
+        _syncIp.Checked = def.SyncIpToDetail;
     }
 
     private void Save()
@@ -162,6 +166,7 @@ public sealed class ConfigForm : Form
             Set(app, "ScaleBase", ((int)_scaleBase.Value).ToString());
             Set(app, "TitleText", _titleText.Text);
             Set(app, "DetailText", _detailText.Text);
+            Set(app, "SyncIpToDetail", _syncIp.Checked ? "true" : "false");
 
             config.Save(ConfigurationSaveMode.Modified);
             ConfigurationManager.RefreshSection("appSettings");
