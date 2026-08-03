@@ -1,28 +1,18 @@
-assets 目录 — 素材获取指引（第三方素材不随仓库分发）
-======================================================
+assets 目录 — 资源文件清单
+==========================
 
-本目录下的素材文件**不入库**（.gitignore 已排除），需要编译者自行获取后放入本目录，
-构建时以 EmbeddedResource 内嵌进 exe（运行时纯内存加载）。
-
-需要的文件（构建完整效果）：
+当前已放入的文件（全部 EmbeddedResource 内嵌进 exe，运行时内存加载，无需随 exe 分发）：
 
   CautionIcon.png      警示图标（黄色三角 + 感叹号）
   CautionIconBG.png    警示图标黑色底板
-  StripePattern.png    斜纹贴图
-  beep.wav             窗口显示提示音
+  StripePattern.png    黄黑斜纹贴图（滚动条纹）
+  beep.wav             窗口显示时的提示音（beep）
   doomshock.wav        音效 1（原版 DoomShock）
   brightflash.wav      音效 2（原版 BrightFlash）
   kremlin-1.ttf        标题字体（Kremlin）
 
-获取方式：
-
-  方案 A（原版观感）：从《Hacknet》游戏解包。
-    ⚠️ 游戏素材版权归开发商（Fell Seal 工作室）所有，仅供个人使用，请勿再分发；
-    由此产生的版权风险由使用者自行承担。
-
-  方案 B（零版权风险，推荐）：替换为自由素材——
-    字体：Google Fonts 的 Russo One / Oranienbaum（SIL OFL，可商用、可再分发、可内嵌）
-    图标/斜纹：可自行绘制（程序支持缺素材降级运行）
-    音效：Kenney.nl（CC0）或 freesound.org 筛选 CC0
-
-缺失任一文件时程序自动降级（跳过对应视觉/音效元素），不会崩溃。
+说明：
+- 缺任何文件程序都会自动降级（跳过对应元素），不会崩溃，但会缺视觉/音效。
+- 音效运行时从嵌入资源读出 PCM，beep 与 doomshock/brightflash 混音成单个 wav 纯内存播放
+  （不写临时文件，避免杀软启发式误报）。
+- 详情小字用的是系统等宽字体（原版 Font7 是位图字体，未使用）。

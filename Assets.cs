@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Media;
 using System.Reflection;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace IncomingConnectionOverlay;
@@ -42,18 +43,19 @@ public sealed class Assets : IDisposable
         a._fontCollection = new PrivateFontCollection();
         if (TryReadResource("kremlin-1.ttf", out byte[] ttf))
         {
-            IntPtr mem = System.Runtime.InteropServices.Marshal.AllocCoTaskMem(ttf.Length);
+            IntPtr mem = Marshal.AllocCoTaskMem(ttf.Length);
             try
             {
-                System.Runtime.InteropServices.Marshal.Copy(ttf, 0, mem, ttf.Length);
+                Marshal.Copy(ttf, 0, mem, ttf.Length);
                 a._fontCollection.AddMemoryFont(mem, ttf.Length);
                 a.TitleFont = new Font(a._fontCollection.Families[0], 24f, FontStyle.Regular, GraphicsUnit.Pixel);
             }
             finally
             {
-                System.Runtime.InteropServices.Marshal.FreeCoTaskMem(mem);
+                Marshal.FreeCoTaskMem(mem);
             }
         }
+
         if (a.TitleFont == null)
         {
             a.TitleFont = new Font("Segoe UI", 24f, FontStyle.Bold, GraphicsUnit.Pixel);

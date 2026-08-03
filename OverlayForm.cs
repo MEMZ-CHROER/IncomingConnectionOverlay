@@ -14,6 +14,10 @@ namespace IncomingConnectionOverlay;
 /// 覆盖层窗口：复刻 Hacknet IncomingConnectionOverlay 的 6 秒全屏动画。
 /// 覆盖模式：全屏分层透明（UpdateLayeredWindow + CreateDIBSection 保 alpha）、置顶、点击穿透。
 /// 预览模式（--preview）：普通可拖动窗口，便于调试。
+///
+/// 逆向还原说明：exe 旧版签名是 (int previewIdx, int autostart)，且判定为 previewIdx != 0，
+/// 导致 FindIndex 返回 -1（未传 --preview）时反而进预览窗口——反转 bug。
+/// 本源码已按上游修复为 (bool preview, bool autostart = true)。
 /// </summary>
 public class OverlayForm : Form
 {
@@ -142,6 +146,10 @@ public class OverlayForm : Form
     private static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "overlay.log");
     private int _ulwFailures;
 
+    /// <summary>
+    /// 已按上游修复为 (bool preview, bool autostart = true)：
+    /// 默认全屏覆盖层；--preview 才进可拖动调试窗口。
+    /// </summary>
     public OverlayForm(bool preview, bool autostart = true)
     {
         _preview = preview;
@@ -155,7 +163,7 @@ public class OverlayForm : Form
         // 预览模式走 OnPaint 直画窗口 DC，必须双缓冲否则每帧擦黑重绘会频闪
         DoubleBuffered = true;
 
-        if (preview)
+        if (_preview)
         {
             Text = "Incoming Connection Overlay — preview";
             FormBorderStyle = FormBorderStyle.Sizable;
@@ -415,12 +423,12 @@ public class OverlayForm : Form
 
         // 标题/详情共用排版矩形（原版 dest3）：
         //   X = area.X + iconInner.Width + 2*4s - 18s，W = area.Width - (iconRect.Width + 2*4s) + 20s
+        // 注：旧版无 Math.Max clamp（上游新版有）
         Rectangle textRect = new(
             area.X + iconInner.Width + (int)(2 * 4 * s) - (int)(18 * s),
             area.Y + (int)(4 * s),
             area.Width - (iconRect.Width + (int)(2 * 4 * s)) + (int)(20 * s),
             (int)(barH * 0.8));
-        textRect = new Rectangle(Math.Max(area.X, textRect.X), textRect.Y, Math.Max(1, textRect.Width), textRect.Height);
 
         // 标题："INCOMING CONNECTION"（Kremlin，恒红不随淡入淡出）
         if (_assets.TitleFont != null)
@@ -614,7 +622,7 @@ public class OverlayForm : Form
         base.OnFormClosed(e);
     }
 
-    private static void Log(string msg)
+    internal static void Log(string msg)
     {
         try
         {

@@ -361,7 +361,16 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-# µÚÈı·½ËØ²Ä²»Èë¿â£¨±àÒëÕß×ÔĞĞ»ñÈ¡£¬¼û assets/README.txt£©
+# ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ø²Ä²ï¿½ï¿½ï¿½â£¨ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ğ»ï¿½È¡ï¿½ï¿½ï¿½ï¿½ assets/README.txtï¿½ï¿½
+
+# this repo
+icco.exe
+overlay.log
+
+# ===== æœ¬ä»“åº“è§„åˆ™ =====
+# Hacknet æ¸¸æˆè§£åŒ…èµ„æº(ç‰ˆæƒç‰©)â€”â€”ä¸å…¥åº“;æ„å»ºæ—¶ä»æœ¬åœ° assets/ ç›®å½•è¯»å–
 assets/*.png
 assets/*.wav
 assets/*.ttf
+# è·¨å¹³å°ç§»æ¤(net8.0 Avalonia)â€”â€”æš‚ä¸å…¥åº“
+IncomingConnectionOverlay.Avalonia/
