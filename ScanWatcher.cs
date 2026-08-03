@@ -65,6 +65,8 @@ internal static class ScanWatcher
         private bool _overlayActive;
         private DateTime _lastTrigger = DateTime.MinValue;
         private NotifyIcon _tray;
+        private ConfigForm _configWindow;   // 单实例：配置编辑窗口
+        private LogViewerForm _logWindow;   // 单实例：日志查看窗口
 
         public WatchForm()
         {
@@ -118,17 +120,10 @@ internal static class ScanWatcher
             var menu = new ContextMenuStrip();
             var triggerItem = new ToolStripMenuItem("立即触发一次覆盖层");
             triggerItem.Click += (_, _) => TriggerManual();
+            var configItem = new ToolStripMenuItem("修改配置");
+            configItem.Click += (_, _) => OpenConfigWindow();
             var logItem = new ToolStripMenuItem("查看日志");
-            logItem.Click += (_, _) =>
-            {
-                try
-                {
-                    System.Diagnostics.Process.Start(OverlayForm.LogPath);
-                }
-                catch
-                {
-                }
-            };
+            logItem.Click += (_, _) => OpenLogWindow();
             var exitItem = new ToolStripMenuItem("退出");
             exitItem.Click += (_, _) =>
             {
@@ -137,6 +132,7 @@ internal static class ScanWatcher
                 Application.Exit();
             };
             menu.Items.Add(triggerItem);
+            menu.Items.Add(configItem);
             menu.Items.Add(logItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(exitItem);
@@ -151,6 +147,32 @@ internal static class ScanWatcher
             catch
             {
             }
+        }
+
+        /// <summary>打开配置编辑窗口（单实例，重复点击只激活已有窗口）。</summary>
+        private void OpenConfigWindow()
+        {
+            if (_configWindow != null && !_configWindow.IsDisposed)
+            {
+                _configWindow.Activate();
+                return;
+            }
+            _configWindow = new ConfigForm();
+            _configWindow.FormClosed += (_, _) => _configWindow = null;
+            _configWindow.Show();
+        }
+
+        /// <summary>打开日志查看窗口（单实例，重复点击只激活已有窗口）。</summary>
+        private void OpenLogWindow()
+        {
+            if (_logWindow != null && !_logWindow.IsDisposed)
+            {
+                _logWindow.Activate();
+                return;
+            }
+            _logWindow = new LogViewerForm();
+            _logWindow.FormClosed += (_, _) => _logWindow = null;
+            _logWindow.Show();
         }
 
         /// <summary>托盘手动触发：跳过冷却，但覆盖层播放中不叠加。</summary>
@@ -280,12 +302,13 @@ internal static class ScanWatcher
             }
 
             NotifyTray(); // 检测到扫描 → 气泡提示
-            ShowOverlay();
+            // 连接表信号有源 IP：详情文字注入真实攻击源（RST 信号无归因则用默认文案）
+            ShowOverlay(rstDesc != null ? null : $"External connection from {IpToString(ip.Value)}\nLogging all activity to ~/log");
         }
 
-        private void ShowOverlay()
+        private void ShowOverlay(string detailOverride = null)
         {
-            var overlay = new OverlayForm(preview: false);
+            var overlay = new OverlayForm(preview: false, autostart: true, detailOverride);
             overlay.FormClosed += (_, _) =>
             {
                 _overlayActive = false;

@@ -117,6 +117,7 @@ public class OverlayForm : Form
     private readonly Settings _settings;      // 可配置项（exe.config appSettings，带默认值）
 
     private readonly bool _preview;
+    private readonly string _detailOverride;   // 非空时覆盖详情文字（watch 模式注入真实源 IP 用）
     private readonly Rectangle _dest;
     private readonly System.Windows.Forms.Timer _timer;
     private readonly Stopwatch _clock = new();
@@ -132,7 +133,7 @@ public class OverlayForm : Form
     internal static readonly string LogPath = Path.Combine(AppContext.BaseDirectory, "overlay.log");
     private int _ulwFailures;
 
-    public OverlayForm(bool preview, bool autostart = true)
+    public OverlayForm(bool preview, bool autostart = true, string detailOverride = null)
     {
         _preview = preview;
         KeyPreview = true;
@@ -425,7 +426,7 @@ public class OverlayForm : Form
         {
             Rectangle detailRect = new(textRect.X, textRect.Y + textRect.Height - (int)(27 * s), textRect.Width, (int)(barH * 0.2));
             Color detailColor = Color.FromArgb((int)(255 * alpha), _settings.DrawColor.R, _settings.DrawColor.G, _settings.DrawColor.B);
-            DrawLabel(g, _settings.DetailText, _assets.DetailFont, detailRect, detailColor, centerHoriz: false);
+            DrawLabel(g, _detailOverride ?? _settings.DetailText, _assets.DetailFont, detailRect, detailColor, centerHoriz: false);
         }
     }
 

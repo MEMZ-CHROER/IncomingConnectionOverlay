@@ -361,7 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
-# µÚÈı·½ËØ²Ä²»Èë¿â£¨±àÒëÕß×ÔĞĞ»ñÈ¡£¬¼û assets/README.txt£©
+# ç¬¬ä¸‰æ–¹ç´ æä¸å…¥åº“ï¼ˆç¼–è¯‘è€…è‡ªè¡Œè·å–ï¼Œè§ assets/README.txtï¼‰
 assets/*.png
 assets/*.wav
 assets/*.ttf
