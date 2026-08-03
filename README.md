@@ -11,8 +11,12 @@
 ## 文件
 
 - `Program.cs` / `Assets.cs` / `OverlayForm.cs` / `ScanWatcher.cs` — 还原源码 + `--watch` 扫描检测（行为按 exe 的 IL 逐方法核对）
-- `assets/` — 从 exe 嵌入资源中抽取的原始资源（png/ttf/wav/README.txt）
-- `IncomingConnectionOverlay.csproj` / `app.manifest` / `LICENSE.txt` — 构建配置（沿用上游）
+- `assets/` — 构建所需的贴图/字体/音效，**本地持有、不入库**（从《Hacknet》游戏解包，版权物，禁止二次分发）；
+  清单与获取指引见 `assets/README.txt`，缺失时程序自动降级（跳过对应元素，不崩溃）
+- `IncomingConnectionOverlay.csproj` / `app.manifest` / `LICENSE.txt` — 构建配置（net48）
+
+> 仓库规则：仅源码入库。构建产物（`bin/`）与版权资源（`assets/*.png|wav|ttf`）均被
+> `.gitignore` 排除；克隆后需自行准备 `assets/` 目录才能完整构建（无资源时仍可编译，运行会缺视觉/音效）。
 
 ## 构建
 
