@@ -26,6 +26,13 @@
     <EmbeddedResource Include="assets\**" />
   </ItemGroup>
 
+  <!-- 跨平台移植目录（net8.0 Avalonia，暂不入库）不参与 net48 编译 -->
+  <ItemGroup>
+    <Compile Remove="IncomingConnectionOverlay.Avalonia\**" />
+    <EmbeddedResource Remove="IncomingConnectionOverlay.Avalonia\**" />
+    <None Remove="IncomingConnectionOverlay.Avalonia\**" />
+  </ItemGroup>
+
   <!-- 无 .NET Framework 4.8 targeting pack 的机器也能构建（如 CI/纯 dotnet SDK 环境） -->
   <ItemGroup>
     <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
