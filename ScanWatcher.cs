@@ -38,6 +38,9 @@ internal static class ScanWatcher
     [DllImport("iphlpapi.dll", SetLastError = true)]
     private static extern uint GetTcpStatistics(byte[] pStats);
 
+    [DllImport("user32.dll")]
+    private static extern bool DestroyIcon(IntPtr hIcon);
+
     // TCP 状态（MIB_TCP_STATE_*）
     private const uint MIB_TCP_STATE_LISTEN = 2;
     private const uint MIB_TCP_STATE_SYN_RCVD = 4;
@@ -58,9 +61,9 @@ internal static class ScanWatcher
         private readonly System.Windows.Forms.Timer _timer = new() { Interval = PollMs };
         private readonly Dictionary<uint, List<(int port, DateTime tick)>> _inbound = new();
         private readonly Queue<(DateTime tick, long outRsts)> _rstSamples = new();
+        private readonly HashSet<(uint ip, int localPort, int remotePort)> _seenConns = new(); // 连接级去重：长连接只计首次出现
         private bool _overlayActive;
         private DateTime _lastTrigger = DateTime.MinValue;
-        private long _lastOutRsts = -1;
         private NotifyIcon _tray;
 
         public WatchForm()
@@ -68,10 +71,15 @@ internal static class ScanWatcher
             ShowInTaskbar = false;
             WindowState = FormWindowState.Minimized;
             Text = "IncomingConnectionOverlay — watch";
-            _timer.Tick += (_, _) => Poll();
+            // 异常防护：任何轮询异常都不能让常驻进程崩溃
+            _timer.Tick += (_, _) =>
+            {
+                try { Poll(); }
+                catch (Exception ex) { Log("POLL ERROR: " + ex.Message); }
+            };
             _timer.Start();
             SetupTray();
-            FormClosed += (_, _) => _tray?.Dispose();
+            FormClosed += (_, _) => { _timer.Stop(); _tray?.Dispose(); };
         }
 
         /// <summary>QQ 式托盘：常驻通知区，双击/菜单手动触发一次，菜单退出结束驻留。</summary>
@@ -86,8 +94,16 @@ internal static class ScanWatcher
                 using var assets = Assets.Load();
                 if (assets.CautionIcon != null)
                 {
-                    using var hicon = Icon.FromHandle(assets.CautionIcon.GetHicon());
-                    _tray.Icon = (Icon)hicon.Clone(); // 克隆脱离位图生命周期
+                    IntPtr h = assets.CautionIcon.GetHicon();
+                    try
+                    {
+                        using var hicon = Icon.FromHandle(h);
+                        _tray.Icon = (Icon)hicon.Clone(); // 克隆脱离位图生命周期
+                    }
+                    finally
+                    {
+                        DestroyIcon(h); // 释放 GetHicon 产生的 HICON
+                    }
                 }
             }
             catch
@@ -102,6 +118,17 @@ internal static class ScanWatcher
             var menu = new ContextMenuStrip();
             var triggerItem = new ToolStripMenuItem("立即触发一次覆盖层");
             triggerItem.Click += (_, _) => TriggerManual();
+            var logItem = new ToolStripMenuItem("查看日志");
+            logItem.Click += (_, _) =>
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(OverlayForm.LogPath);
+                }
+                catch
+                {
+                }
+            };
             var exitItem = new ToolStripMenuItem("退出");
             exitItem.Click += (_, _) =>
             {
@@ -110,6 +137,7 @@ internal static class ScanWatcher
                 Application.Exit();
             };
             menu.Items.Add(triggerItem);
+            menu.Items.Add(logItem);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(exitItem);
             _tray.ContextMenuStrip = menu;
@@ -155,16 +183,27 @@ internal static class ScanWatcher
             DateTime now = DateTime.UtcNow;
 
             // 数据采集始终进行（RST 基线、表事件都要保持新鲜），触发判定在门控之后
-            (HashSet<int> listeners, List<(uint ip, int port)> events) = ReadTcpTable();
-            foreach ((uint ip, int port) in events)
+            var conns = ReadTcpTable();
+            // 连接级去重：只统计【新出现】的连接（元组 = 源IP+本地端口+远端端口）。
+            // ESTABLISHED 长连接（RDP/SSH/游戏等）只在建立瞬间计 1 次，之后每轮同元组不再计，
+            // 避免持续入站连接在 3s 窗口内刷满事件阈值导致周期性误触发。
+            foreach (var c in conns.connections)
             {
-                if (!_inbound.TryGetValue(ip, out var list))
+                if (_seenConns.Contains(c))
+                {
+                    continue;
+                }
+                if (!_inbound.TryGetValue(c.ip, out var list))
                 {
                     list = new List<(int, DateTime)>();
-                    _inbound[ip] = list;
+                    _inbound[c.ip] = list;
                 }
-                list.Add((port, now));
+                list.Add((c.localPort, now));
             }
+            // 快照更新：只保留当前仍存在的连接；连接断开后若重新出现（同元组）会重新计数，
+            // 对 distinctPorts 阈值无影响（同端口），扫描重试场景可接受。
+            _seenConns.Clear();
+            _seenConns.UnionWith(conns.connections);
             foreach (uint ip in _inbound.Keys.ToList())
             {
                 _inbound[ip].RemoveAll(e => (now - e.tick).TotalMilliseconds > WindowMs);
@@ -211,6 +250,7 @@ internal static class ScanWatcher
             {
                 uint ip = kv.Key;
                 var list = kv.Value;
+                // MIB 地址字段按网络字节序字节流存储：小端读 uint 后 (ip & 0xFF) 即 IP 最高字节
                 bool loopback = (ip & 0xFF) == 127;
                 int distinctPorts = list.Select(e => e.port).Distinct().Count();
                 if (distinctPorts >= ScanPortsThreshold || (!loopback && list.Count >= ScanEventsThreshold))
@@ -239,7 +279,6 @@ internal static class ScanWatcher
                     $"ports=[{string.Join(",", sample)}{(sample.Count >= 12 ? ",..." : "")}] — triggering overlay");
             }
 
-            var overlay = new OverlayForm(preview: false);
             NotifyTray(); // 检测到扫描 → 气泡提示
             ShowOverlay();
         }
@@ -255,24 +294,24 @@ internal static class ScanWatcher
             overlay.Show(); // 6 秒动画播完自动 Close，ESC 可提前退出
         }
 
-        /// <summary>读当前 TCP 连接表：LISTEN 端口集合 + 确凿的入站事件（含回环源）。</summary>
-        private static (HashSet<int> listeners, List<(uint ip, int port)> events) ReadTcpTable()
+        /// <summary>读当前 TCP 连接表：LISTEN 端口集合 + 当前入站连接集合（SYN_RCVD 或目标在 LISTEN 的连接，含回环源）。</summary>
+        private static (HashSet<int> listeners, HashSet<(uint ip, int localPort, int remotePort)> connections) ReadTcpTable()
         {
             var listeners = new HashSet<int>();
-            var events = new List<(uint, int)>();
+            var conns = new HashSet<(uint, int, int)>();
 
             int size = 0;
             uint rc = GetExtendedTcpTable(null, ref size, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
             if (rc != ERROR_INSUFFICIENT_BUFFER || size <= 0)
             {
-                return (listeners, events);
+                return (listeners, conns);
             }
 
             byte[] buf = new byte[size];
             rc = GetExtendedTcpTable(buf, ref size, false, AF_INET, TCP_TABLE_OWNER_PID_ALL, 0);
             if (rc != NO_ERROR)
             {
-                return (listeners, events);
+                return (listeners, conns);
             }
 
             // MIB_TCPROW_OWNER_PID：state/localAddr/localPort/remoteAddr/remotePort/owningPid，各 4 字节
@@ -283,7 +322,9 @@ internal static class ScanWatcher
                 uint state = BitConverter.ToUInt32(buf, off);
                 uint localPortRaw = BitConverter.ToUInt32(buf, off + 8);
                 uint remoteAddr = BitConverter.ToUInt32(buf, off + 12);
+                uint remotePortRaw = BitConverter.ToUInt32(buf, off + 16);
                 int localPort = (int)(((localPortRaw & 0xFF) << 8) | ((localPortRaw >> 8) & 0xFF)); // 网络字节序 → 主机序
+                int remotePort = (int)(((remotePortRaw & 0xFF) << 8) | ((remotePortRaw >> 8) & 0xFF)); // 网络字节序 → 主机序
 
                 if (state == MIB_TCP_STATE_LISTEN)
                 {
@@ -296,10 +337,10 @@ internal static class ScanWatcher
                 }
                 if (state == MIB_TCP_STATE_SYN_RCVD || listeners.Contains(localPort))
                 {
-                    events.Add((remoteAddr, localPort));
+                    conns.Add((remoteAddr, localPort, remotePort));
                 }
             }
-            return (listeners, events);
+            return (listeners, conns);
         }
 
         /// <summary>读 MIB_TCPSTATS.dwOutRsts（累计 RST 发送数）；失败返回 -1。</summary>
@@ -315,6 +356,7 @@ internal static class ScanWatcher
 
         private static string IpToString(uint addr)
         {
+            // MIB 地址字段按网络字节序字节流存储：GetBytes 的内存字节序即点分十进制顺序（首字节 = IP 最高字节）
             byte[] b = BitConverter.GetBytes(addr);
             return $"{b[0]}.{b[1]}.{b[2]}.{b[3]}";
         }
